@@ -1,5 +1,5 @@
 """
-overlay.py - Overlay horizontal elegante para monitoramento de jogos
+overlay.py - Overlay transparente que não atrapalha os cliques
 """
 
 import sys
@@ -34,112 +34,100 @@ class OverlayThread(QThread):
                 self.metrics_updated.emit(metrics)
                 time.sleep(self.interval)
             except Exception as e:
-                print(f"Erro no monitoramento: {e}")
+                print(f"Erro: {e}")
                 
     def stop(self):
         self.running = False
         self.wait()
 
 
-class ModernOverlayWindow(QWidget):
+class TransparentOverlay(QWidget):
     def __init__(self):
         super().__init__()
         self.monitor = SystemMonitor()
         self.monitor_thread = None
         self.is_monitoring = False
-        self.dragging = False
-        self.drag_position = QPoint()
         
-        # Configurações
-        self.metrics_enabled = {
-            'fps': True,
-            'cpu': True,
-            'ram': True,
-            'gpu': True,
-            'network': True
-        }
-        
-        self.setup_overlay_properties()
+        self.setup_overlay()
         self.setup_ui()
         
-    def setup_overlay_properties(self):
-        # Janela totalmente transparente, sem bordas
+    def setup_overlay(self):
+        """Configura overlay totalmente transparente"""
+        # Janela sem bordas, sempre no topo
         self.setWindowFlags(
             Qt.FramelessWindowHint |
             Qt.WindowStaysOnTopHint |
-            Qt.Tool |
-            Qt.WindowTransparentForInput  # Clica através da janela
+            Qt.Tool
         )
         
-        # Remover essa linha se quiser interagir com o overlay
-        # self.setAttribute(Qt.WA_TranslucentBackground)
+        # FUNDO TOTALMENTE TRANSPARENTE
+        self.setAttribute(Qt.WA_TranslucentBackground)
         
+        # PERMITIR CLICAR ATRAVÉS (IMPORTANTE!)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        
+        # Posição e tamanho
         screen = QApplication.primaryScreen().geometry()
-        self.setGeometry(screen.width() - 450, 60, 440, 50)
+        self.setGeometry(screen.width() - 400, 50, 380, 60)
         
     def setup_ui(self):
+        # Layout principal
         layout = QHBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        layout.setSpacing(12)
         self.setLayout(layout)
         
-        # Container principal com fundo semi-transparente
+        # Container com fundo levemente escuro (visível mas não atrapalha)
         self.container = QFrame()
         self.container.setStyleSheet("""
             QFrame {
-                background-color: rgba(20, 20, 30, 180);
-                border-radius: 25px;
-                border: 1px solid rgba(76, 159, 112, 100);
+                background-color: rgba(0, 0, 0, 160);
+                border-radius: 30px;
+                border: 1px solid rgba(76, 159, 112, 150);
             }
         """)
         
         container_layout = QHBoxLayout(self.container)
-        container_layout.setContentsMargins(15, 8, 15, 8)
+        container_layout.setContentsMargins(18, 8, 18, 8)
         container_layout.setSpacing(20)
         
-        # Botão de menu
+        # Botão de menu (único elemento clicável)
         self.menu_btn = QPushButton("⚙️")
         self.menu_btn.setFixedSize(32, 32)
         self.menu_btn.setStyleSheet("""
             QPushButton {
-                background-color: rgba(76, 159, 112, 80);
+                background-color: rgba(76, 159, 112, 100);
                 color: #4c9f70;
                 border-radius: 16px;
                 font-size: 16px;
                 border: none;
             }
             QPushButton:hover {
-                background-color: rgba(76, 159, 112, 150);
+                background-color: rgba(76, 159, 112, 200);
                 color: white;
             }
         """)
         self.menu_btn.clicked.connect(self.show_menu)
         container_layout.addWidget(self.menu_btn)
         
-        # Separador
-        sep = QFrame()
-        sep.setFrameShape(QFrame.VLine)
-        sep.setStyleSheet("background-color: rgba(76, 159, 112, 80); max-width: 1px;")
-        container_layout.addWidget(sep)
-        
         # FPS
-        self.fps_widget = self.create_metric_widget("🎮", "FPS", "0")
+        self.fps_widget = self.create_metric("🎮", "FPS", "")
         container_layout.addWidget(self.fps_widget)
         
         # CPU
-        self.cpu_widget = self.create_metric_widget("🖥️", "CPU", "0%")
+        self.cpu_widget = self.create_metric("🖥️", "CPU", "%")
         container_layout.addWidget(self.cpu_widget)
         
         # RAM
-        self.ram_widget = self.create_metric_widget("💾", "RAM", "0%")
+        self.ram_widget = self.create_metric("💾", "RAM", "%")
         container_layout.addWidget(self.ram_widget)
         
         # GPU
-        self.gpu_widget = self.create_metric_widget("🎮", "GPU", "0%")
+        self.gpu_widget = self.create_metric("🎮", "GPU", "%")
         container_layout.addWidget(self.gpu_widget)
         
         # Rede
-        self.net_widget = self.create_metric_widget("🌐", "NET", "0KB/s")
+        self.net_widget = self.create_metric("🌐", "NET", "")
         container_layout.addWidget(self.net_widget)
         
         # Botão fechar
@@ -147,14 +135,14 @@ class ModernOverlayWindow(QWidget):
         self.close_btn.setFixedSize(28, 28)
         self.close_btn.setStyleSheet("""
             QPushButton {
-                background-color: rgba(255, 68, 68, 100);
+                background-color: rgba(255, 68, 68, 120);
                 color: #ff8888;
                 border-radius: 14px;
                 font-size: 14px;
                 border: none;
             }
             QPushButton:hover {
-                background-color: rgba(255, 68, 68, 200);
+                background-color: rgba(255, 68, 68, 220);
                 color: white;
             }
         """)
@@ -163,170 +151,47 @@ class ModernOverlayWindow(QWidget):
         
         layout.addWidget(self.container)
         
-        # Tornar arrastável
+        # Somente o container pode ser arrastado (para não interferir)
         self.container.mousePressEvent = self.mouse_press_event
         self.container.mouseMoveEvent = self.mouse_move_event
         self.container.mouseReleaseEvent = self.mouse_release_event
         
-        # Atualizar visibilidade
-        self.update_visibility()
+        self.dragging = False
+        self.drag_position = QPoint()
         
-        # Timer para efeito de brilho
+        # Timer para brilho do FPS
         self.glow_timer = QTimer()
         self.glow_timer.timeout.connect(self.update_glow)
         self.glow_timer.start(500)
+        self.has_game = False
         self.glow = False
         
-    def create_metric_widget(self, icon, label, unit):
-        """Cria um widget de métrica horizontal"""
+    def create_metric(self, icon, label, unit):
+        """Cria widget de métrica"""
         widget = QWidget()
         layout = QHBoxLayout(widget)
-        layout.setContentsMargins(5, 0, 5, 0)
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
         
-        # Ícone
-        icon_label = QLabel(icon)
-        icon_label.setStyleSheet("font-size: 14px;")
-        layout.addWidget(icon_label)
+        icon_lbl = QLabel(icon)
+        icon_lbl.setStyleSheet("font-size: 13px;")
+        layout.addWidget(icon_lbl)
         
-        # Nome
-        name_label = QLabel(label)
-        name_label.setStyleSheet("color: #aaaaaa; font-size: 10px; font-weight: 500;")
-        layout.addWidget(name_label)
+        name_lbl = QLabel(label)
+        name_lbl.setStyleSheet("color: #aaaaaa; font-size: 9px;")
+        layout.addWidget(name_lbl)
         
-        # Valor
-        value_label = QLabel("0")
-        value_label.setStyleSheet("color: #4c9f70; font-size: 14px; font-weight: bold; font-family: 'Monospace';")
-        layout.addWidget(value_label)
+        value_lbl = QLabel("0")
+        value_lbl.setStyleSheet("color: #4c9f70; font-size: 14px; font-weight: bold;")
+        layout.addWidget(value_lbl)
         
-        # Unidade
-        unit_label = QLabel(unit)
-        unit_label.setStyleSheet("color: #666666; font-size: 9px;")
-        layout.addWidget(unit_label)
+        if unit:
+            unit_lbl = QLabel(unit)
+            unit_lbl.setStyleSheet("color: #666666; font-size: 9px;")
+            layout.addWidget(unit_lbl)
         
-        widget.value_label = value_label
-        widget.unit = unit
-        
+        widget.value_label = value_lbl
         return widget
-    
-    def update_visibility(self):
-        """Atualiza visibilidade dos widgets"""
-        self.fps_widget.setVisible(self.metrics_enabled.get('fps', True))
-        self.cpu_widget.setVisible(self.metrics_enabled.get('cpu', True))
-        self.ram_widget.setVisible(self.metrics_enabled.get('ram', True))
-        self.gpu_widget.setVisible(self.metrics_enabled.get('gpu', True))
-        self.net_widget.setVisible(self.metrics_enabled.get('network', True))
-        
-        # Ajustar largura
-        self.adjustSize()
-    
-    def update_glow(self):
-        """Efeito de brilho no FPS quando jogo está rodando"""
-        self.glow = not self.glow
-        if hasattr(self, 'has_game') and self.has_game:
-            color = "#4cff70" if self.glow else "#4c9f70"
-            self.fps_widget.value_label.setStyleSheet(f"color: {color}; font-size: 16px; font-weight: bold;")
-    
-    def show_menu(self):
-        """Mostra menu de configurações"""
-        menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #1e1e2e;
-                color: white;
-                border: 1px solid #4c9f70;
-                border-radius: 12px;
-                padding: 8px;
-            }
-            QMenu::item {
-                padding: 8px 30px 8px 15px;
-                border-radius: 6px;
-            }
-            QMenu::item:selected {
-                background-color: #4c9f70;
-            }
-            QMenu::item:checked {
-                background-color: #4c9f70;
-            }
-        """)
-        
-        # Seção de métricas
-        metrics_menu = menu.addMenu("📊 Métricas")
-        metrics_menu.setStyleSheet(menu.styleSheet())
-        
-        fps_action = QAction("🎮 FPS", metrics_menu)
-        fps_action.setCheckable(True)
-        fps_action.setChecked(self.metrics_enabled.get('fps', True))
-        fps_action.triggered.connect(lambda: self.toggle_metric('fps'))
-        metrics_menu.addAction(fps_action)
-        
-        cpu_action = QAction("🖥️ CPU", metrics_menu)
-        cpu_action.setCheckable(True)
-        cpu_action.setChecked(self.metrics_enabled.get('cpu', True))
-        cpu_action.triggered.connect(lambda: self.toggle_metric('cpu'))
-        metrics_menu.addAction(cpu_action)
-        
-        ram_action = QAction("💾 RAM", metrics_menu)
-        ram_action.setCheckable(True)
-        ram_action.setChecked(self.metrics_enabled.get('ram', True))
-        ram_action.triggered.connect(lambda: self.toggle_metric('ram'))
-        metrics_menu.addAction(ram_action)
-        
-        gpu_action = QAction("🎮 GPU", metrics_menu)
-        gpu_action.setCheckable(True)
-        gpu_action.setChecked(self.metrics_enabled.get('gpu', True))
-        gpu_action.triggered.connect(lambda: self.toggle_metric('gpu'))
-        metrics_menu.addAction(gpu_action)
-        
-        net_action = QAction("🌐 Rede", metrics_menu)
-        net_action.setCheckable(True)
-        net_action.setChecked(self.metrics_enabled.get('network', True))
-        net_action.triggered.connect(lambda: self.toggle_metric('network'))
-        metrics_menu.addAction(net_action)
-        
-        menu.addSeparator()
-        
-        # Transparência
-        opacity_menu = menu.addMenu("🎨 Transparência")
-        for op in [180, 200, 220, 240]:
-            action = QAction(f"{int((op/255)*100)}%", opacity_menu)
-            action.triggered.connect(lambda checked, o=op: self.change_opacity(o))
-            opacity_menu.addAction(action)
-        
-        menu.addSeparator()
-        
-        # Sair
-        quit_action = QAction("❌ Fechar Overlay", menu)
-        quit_action.triggered.connect(self.close_app)
-        menu.addAction(quit_action)
-        
-        menu.exec_(self.menu_btn.mapToGlobal(self.menu_btn.rect().bottomLeft()))
-    
-    def toggle_metric(self, metric):
-        self.metrics_enabled[metric] = not self.metrics_enabled[metric]
-        self.update_visibility()
-        self.save_settings()
-    
-    def change_opacity(self, opacity):
-        self.container.setStyleSheet(f"""
-            QFrame {{
-                background-color: rgba(20, 20, 30, {opacity});
-                border-radius: 25px;
-                border: 1px solid rgba(76, 159, 112, 100);
-            }}
-        """)
-        self.save_settings()
-    
-    def save_settings(self):
-        settings = {
-            'metrics': self.metrics_enabled,
-            'opacity': 180
-        }
-        try:
-            with open(os.path.expanduser("~/.gamemonitor_settings.json"), 'w') as f:
-                json.dump(settings, f)
-        except:
-            pass
     
     def mouse_press_event(self, event):
         if event.button() == Qt.LeftButton:
@@ -343,20 +208,108 @@ class ModernOverlayWindow(QWidget):
         self.dragging = False
         event.accept()
     
+    def update_glow(self):
+        """Efeito de brilho no FPS quando jogo ativo"""
+        if self.has_game:
+            self.glow = not self.glow
+            color = "#6cff90" if self.glow else "#4cff70"
+            self.fps_widget.value_label.setStyleSheet(f"color: {color}; font-size: 16px; font-weight: bold;")
+    
+    def show_menu(self):
+        """Menu de configurações"""
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #1e1e2e;
+                color: #ffffff;
+                border: 1px solid #4c9f70;
+                border-radius: 12px;
+                padding: 8px;
+            }
+            QMenu::item {
+                padding: 8px 25px 8px 15px;
+                border-radius: 6px;
+            }
+            QMenu::item:selected {
+                background-color: #4c9f70;
+            }
+        """)
+        
+        # Posição
+        pos_menu = menu.addMenu("📌 Posição")
+        
+        positions = [
+            ("Superior Direito", "top-right"),
+            ("Superior Esquerdo", "top-left"),
+            ("Inferior Direito", "bottom-right"),
+            ("Inferior Esquerdo", "bottom-left")
+        ]
+        
+        for name, pos in positions:
+            action = QAction(name, pos_menu)
+            action.triggered.connect(lambda checked, p=pos: self.change_position(p))
+            pos_menu.addAction(action)
+        
+        menu.addSeparator()
+        
+        # Transparência
+        trans_menu = menu.addMenu("🎨 Transparência")
+        for opacity in [100, 130, 160, 190, 220]:
+            action = QAction(f"{int((opacity/255)*100)}%", trans_menu)
+            action.triggered.connect(lambda checked, o=opacity: self.change_opacity(o))
+            trans_menu.addAction(action)
+        
+        menu.addSeparator()
+        
+        # Fechar
+        quit_action = QAction("❌ Fechar", menu)
+        quit_action.triggered.connect(self.close_app)
+        menu.addAction(quit_action)
+        
+        menu.exec_(self.menu_btn.mapToGlobal(self.menu_btn.rect().bottomLeft()))
+    
+    def change_position(self, position):
+        """Muda posição do overlay"""
+        screen = QApplication.primaryScreen().geometry()
+        width, height = self.width(), self.height()
+        
+        if position == "top-right":
+            x, y = screen.width() - width - 20, 50
+        elif position == "top-left":
+            x, y = 20, 50
+        elif position == "bottom-right":
+            x, y = screen.width() - width - 20, screen.height() - height - 60
+        elif position == "bottom-left":
+            x, y = 20, screen.height() - height - 60
+        else:
+            x, y = screen.width() - width - 20, 50
+        
+        self.move(x, y)
+    
+    def change_opacity(self, opacity):
+        """Muda transparência"""
+        self.container.setStyleSheet(f"""
+            QFrame {{
+                background-color: rgba(0, 0, 0, {opacity});
+                border-radius: 30px;
+                border: 1px solid rgba(76, 159, 112, 150);
+            }}
+        """)
+    
     def update_metrics(self, metrics):
         try:
-            # FPS - CORRIGIDO
+            # FPS
             if metrics.get('fps'):
-                game_running = metrics['fps'].get('game_running', False)
-                current_fps = metrics['fps'].get('current', 0)
+                game = metrics['fps'].get('game_running', False)
+                fps = metrics['fps'].get('current', 0)
                 
-                if game_running and current_fps > 0:
-                    self.fps_widget.value_label.setText(f"{current_fps:.0f}")
+                if game and fps > 0:
+                    self.fps_widget.value_label.setText(f"{fps:.0f}")
                     self.has_game = True
                     
-                    if current_fps >= 60:
+                    if fps >= 60:
                         self.fps_widget.value_label.setStyleSheet("color: #4cff70; font-size: 16px; font-weight: bold;")
-                    elif current_fps >= 30:
+                    elif fps >= 30:
                         self.fps_widget.value_label.setStyleSheet("color: #ffaa44; font-size: 16px; font-weight: bold;")
                     else:
                         self.fps_widget.value_label.setStyleSheet("color: #ff4444; font-size: 16px; font-weight: bold;")
@@ -400,14 +353,14 @@ class ModernOverlayWindow(QWidget):
                 self.gpu_widget.value_label.setStyleSheet("color: #666666; font-size: 14px;")
             
             # Rede
-            download = metrics['network']['download_speed_mb_s'] * 1024
-            upload = metrics['network']['upload_speed_mb_s'] * 1024
-            if download > 0 or upload > 0:
-                self.net_widget.value_label.setText(f"↓{download:.0f}↑{upload:.0f}")
-                self.net_widget.value_label.setStyleSheet("color: #4c9f70; font-size: 12px;")
+            down = metrics['network']['download_speed_mb_s'] * 1024
+            up = metrics['network']['upload_speed_mb_s'] * 1024
+            if down > 0 or up > 0:
+                self.net_widget.value_label.setText(f"↓{down:.0f}↑{up:.0f}")
+                self.net_widget.value_label.setStyleSheet("color: #4c9f70; font-size: 11px;")
             else:
                 self.net_widget.value_label.setText("0")
-                self.net_widget.value_label.setStyleSheet("color: #666666; font-size: 12px;")
+                self.net_widget.value_label.setStyleSheet("color: #666666; font-size: 11px;")
                 
         except Exception as e:
             print(f"Erro: {e}")
@@ -425,11 +378,9 @@ class ModernOverlayWindow(QWidget):
         
     def stop_monitoring(self):
         self.is_monitoring = False
-        
         if self.monitor_thread:
             self.monitor_thread.stop()
             self.monitor_thread = None
-        
         self.hide()
     
     def close_app(self):
@@ -441,11 +392,12 @@ class ModernOverlayWindow(QWidget):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
-    # Garantir que o FPS seja detectado
-    print("Iniciando overlay horizontal...")
-    print("Abra um jogo para ver o FPS!")
+    print("🎮 Overlay Transparente Iniciado!")
+    print("✨ O overlay é totalmente transparente e você pode clicar através dele!")
+    print("⚙️ Clique na engrenagem para configurar posição e transparência")
+    print("📌 Arraste pelo fundo semi-transparente para mover")
     
-    window = ModernOverlayWindow()
-    window.start_monitoring()
+    overlay = TransparentOverlay()
+    overlay.start_monitoring()
     
     sys.exit(app.exec_())
