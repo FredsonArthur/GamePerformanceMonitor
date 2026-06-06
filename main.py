@@ -1,79 +1,55 @@
-#!/usr/bin/env python3
-"""
-GamePerformanceMonitor - Monitor de performance para jogos no Linux
-Ponto de entrada principal com logging
-"""
-
 import sys
 import os
-import time
+import json
+sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
+from PyQt5.QtWidgets import QApplication
+from overlay import TransparentOverlay
 
-# Adiciona o diretório src ao path do Python
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+def setup_environment():
+    """Verifica e cria estruturas necessárias para o funcionamento do app"""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    logs_dir = os.path.join(base_dir, "logs")
+    config_file = os.path.join(base_dir, "config.json")
+    
+    # 1. Garante que a pasta logs existe
+    if not os.path.exists(logs_dir):
+        print("📁 Pasta 'logs' não encontrada. Criando...")
+        os.makedirs(logs_dir)
+        with open(os.path.join(logs_dir, ".gitkeep"), 'w') as f:
+            pass
 
-from monitor import SystemMonitor
-from logger import PerformanceLogger
+    # 2. Garante que o config.json existe
+    if not os.path.exists(config_file):
+        print("⚙️ config.json não encontrado. Criando configuração padrão...")
+        default_config = {
+            "monitor": {"interval_seconds": 1.0, "log_enabled": False},
+            "overlay": {
+                "font_size": 12,
+                "opacity": 0.8
+            }
+        }
+        with open(config_file, 'w') as f:
+            json.dump(default_config, f, indent=4)
 
 def main():
-    print("=" * 60)
-    print("🎮 GamePerformanceMonitor v0.2.0")
-    print("Monitor de performance para jogos no Linux")
-    print("=" * 60)
+    # Inicializa o ambiente
+    setup_environment()
     
-    # Inicializar componentes
-    monitor = SystemMonitor()
-    logger = PerformanceLogger()
+    app = QApplication(sys.argv)
     
-    # Perguntar se quer salvar logs
-    print("\nOpções:")
-    print("1. Apenas monitorar (sem salvar)")
-    print("2. Monitorar e salvar logs")
+    # Exibe Banner de inicialização
+    print("==========================================")
+    print("   GAME PERFORMANCE MONITOR - INICIADO    ")
+    print("==========================================")
+    print("✨ Status: Pronto para monitorar")
+    print("⚙️ Configurações carregadas com sucesso")
+    print("==========================================")
     
-    choice = input("\nEscolha (1/2): ").strip()
+    # Inicia a aplicação
+    overlay = TransparentOverlay()
+    overlay.start_monitoring()
     
-    save_logs = (choice == "2")
-    
-    if save_logs:
-        session_name = input("Nome da sessão (Enter para gerar automático): ").strip()
-        if not session_name:
-            session_name = None
-        logger.start_session(session_name)
-        print("\n📝 Salvando métricas em CSV...")
-    
-    print("\n🖥️ Monitorando... Pressione Ctrl+C para parar\n")
-    
-    try:
-        while True:
-            # Coletar métricas
-            metrics = monitor.get_all_metrics()
-            
-            # Mostrar no console
-            monitor.print_metrics(metrics)
-            
-            # Salvar se necessário
-            if save_logs:
-                logger.log_metrics(metrics)
-            
-            time.sleep(2)  # Atualiza a cada 2 segundos
-            
-    except KeyboardInterrupt:
-        print("\n\n✅ Monitoramento encerrado!")
-        
-        if save_logs:
-            logger.stop_session()
-            
-            # Mostrar resumo da sessão
-            print("\n📊 Resumo da sessão:")
-            sessions = logger.list_sessions()
-            if sessions:
-                latest = sessions[0]
-                summary = logger.get_session_summary(latest['name'])
-                if summary:
-                    print(f"  Duração: {summary['duration_seconds']} segundos")
-                    print(f"  CPU: média {summary['cpu']['avg']}% (max {summary['cpu']['max']}%)")
-                    print(f"  GPU: média {summary['gpu']['avg']}% (max {summary['gpu']['max']}%)")
-                    print(f"  RAM: média {summary['ram']['avg']}% (max {summary['ram']['max']}%)")
-                    print(f"\n  📁 Log salvo em: logs/{latest['name']}.csv")
+    sys.exit(app.exec_())
 
 if __name__ == "__main__":
     main()
