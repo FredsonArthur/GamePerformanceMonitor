@@ -1,6 +1,5 @@
 """
 overlay.py - Janela flutuante transparente para mostrar métricas durante o jogo
-Suporta: Posição arrastável, sempre no topo, fundo transparente
 """
 
 import sys
@@ -8,7 +7,6 @@ import os
 import time
 from datetime import datetime
 
-# Adiciona o diretório src ao path
 sys.path.insert(0, os.path.dirname(__file__))
 
 from PyQt5.QtWidgets import *
@@ -19,7 +17,6 @@ from monitor import SystemMonitor
 from logger import PerformanceLogger
 
 class OverlayThread(QThread):
-    """Thread separada para monitoramento no overlay"""
     metrics_updated = pyqtSignal(dict)
     
     def __init__(self, monitor, interval=1):
@@ -36,15 +33,13 @@ class OverlayThread(QThread):
                 self.metrics_updated.emit(metrics)
                 time.sleep(self.interval)
             except Exception as e:
-                print(f"Erro no monitoramento do overlay: {e}")
+                print(f"Erro no monitoramento: {e}")
                 
     def stop(self):
         self.running = False
         self.wait()
 
 class OverlayWindow(QWidget):
-    """Janela flutuante transparente para overlay de jogos"""
-    
     def __init__(self):
         super().__init__()
         self.monitor = SystemMonitor()
@@ -57,7 +52,6 @@ class OverlayWindow(QWidget):
         self.setup_ui()
         
     def setup_overlay_properties(self):
-        """Configura propriedades da janela overlay"""
         self.setWindowFlags(
             Qt.FramelessWindowHint |
             Qt.WindowStaysOnTopHint |
@@ -68,10 +62,9 @@ class OverlayWindow(QWidget):
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         
         screen = QApplication.primaryScreen().geometry()
-        self.setGeometry(screen.width() - 300, 100, 280, 220)
+        self.setGeometry(screen.width() - 320, 100, 300, 240)
         
     def setup_ui(self):
-        """Configura os elementos da interface do overlay"""
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(5)
@@ -80,7 +73,7 @@ class OverlayWindow(QWidget):
         self.frame = QFrame()
         self.frame.setStyleSheet("""
             QFrame {
-                background-color: rgba(0, 0, 0, 180);
+                background-color: rgba(0, 0, 0, 200);
                 border-radius: 10px;
                 border: 1px solid #4c9f70;
             }
@@ -101,21 +94,27 @@ class OverlayWindow(QWidget):
         title_label.setStyleSheet("font-weight: bold; font-size: 12px; color: #4c9f70;")
         title_layout.addWidget(title_label)
         
+        title_layout.addStretch()
+        
         self.close_btn = QPushButton("✕")
-        self.close_btn.setFixedSize(20, 20)
+        self.close_btn.setFixedSize(24, 24)
         self.close_btn.setStyleSheet("""
             QPushButton {
                 background-color: #ff4444;
                 color: white;
-                border-radius: 10px;
-                font-size: 12px;
+                border-radius: 12px;
+                font-size: 14px;
                 font-weight: bold;
+                border: none;
             }
             QPushButton:hover {
                 background-color: #ff6666;
             }
+            QPushButton:pressed {
+                background-color: #cc0000;
+            }
         """)
-        self.close_btn.clicked.connect(self.hide_overlay)
+        self.close_btn.clicked.connect(self.close_app)
         title_layout.addWidget(self.close_btn)
         
         frame_layout.addLayout(title_layout)
@@ -126,7 +125,7 @@ class OverlayWindow(QWidget):
         line.setStyleSheet("background-color: #4c9f70; max-height: 1px;")
         frame_layout.addWidget(line)
         
-        # Labels para métricas
+        # Labels
         self.fps_label = QLabel("🎮 FPS: --")
         self.fps_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         frame_layout.addWidget(self.fps_label)
@@ -149,6 +148,11 @@ class OverlayWindow(QWidget):
         self.recording_label = QLabel("⚪ Não gravando")
         self.recording_label.setStyleSheet("color: #888888; font-size: 9px;")
         frame_layout.addWidget(self.recording_label)
+        
+        # Status da GPU (debug)
+        self.gpu_status_label = QLabel("")
+        self.gpu_status_label.setStyleSheet("color: #888888; font-size: 8px;")
+        frame_layout.addWidget(self.gpu_status_label)
         
         layout.addWidget(self.frame)
         
@@ -207,7 +211,6 @@ class OverlayWindow(QWidget):
             if metrics.get('fps') and metrics['fps'].get('game_running', False):
                 fps_current = metrics['fps'].get('current', 0)
                 self.fps_label.setText(f"🎮 FPS: {fps_current:.1f}")
-                self.fps_label.setVisible(True)
                 
                 if fps_current >= 60:
                     self.fps_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #4c9f70;")
@@ -218,35 +221,46 @@ class OverlayWindow(QWidget):
                 else:
                     self.fps_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #ff4444;")
             else:
-                self.fps_label.setText("🎮 FPS: --")
-                self.fps_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #888888;")
-                self.fps_label.setVisible(True)
+                self.fps_label.setText("🎮 FPS: -- (sem jogo)")
+                self.fps_label.setStyleSheet("font-size: 12px; color: #888888;")
             
-            # GPU
+            # GPU - SEMPRE mostrar, mesmo se for 0
             gpu_percent = metrics['gpu']['percent']
             gpu_temp = metrics['gpu']['temp']
-            if gpu_percent > 0:
+            
+            # Debug: mostrar status da GPU
+            self.gpu_status_label.setText(f"GPU Type: {self.monitor.hardware.gpu_type}")
+            
+            # Garantir que a GPU sempre fique visível
+            self.gpu_label.setVisible(True)
+            self.vram_label.setVisible(True)
+            
+            if gpu_percent > 0 or self.monitor.hardware.gpu_type != 'unknown':
                 self.gpu_label.setText(f"GPU: {gpu_percent:.0f}%  🌡️ {gpu_temp:.0f}°C")
                 self.gpu_label.setVisible(True)
-                self.vram_label.setVisible(True)
                 
                 if gpu_percent > 80:
-                    self.gpu_label.setStyleSheet("color: #ff4444;")
+                    self.gpu_label.setStyleSheet("color: #ff4444; font-weight: bold;")
                 elif gpu_percent > 60:
                     self.gpu_label.setStyleSheet("color: #ffaa44;")
                 else:
                     self.gpu_label.setStyleSheet("color: #4c9f70;")
                 
+                # VRAM
                 if metrics['gpu']['vram_total_mb'] > 0:
                     vram_used = metrics['gpu']['vram_used_mb']
                     vram_total = metrics['gpu']['vram_total_mb']
                     self.vram_label.setText(f"VRAM: {vram_used:.0f}/{vram_total:.0f} MB")
                     self.vram_label.setVisible(True)
+                    self.vram_label.setStyleSheet("color: #888888;")
                 else:
-                    self.vram_label.setVisible(False)
+                    self.vram_label.setText("VRAM: --/-- MB")
+                    self.vram_label.setVisible(True)
             else:
-                self.gpu_label.setVisible(False)
-                self.vram_label.setVisible(False)
+                self.gpu_label.setText(f"GPU: {self.monitor.hardware.gpu_type.upper()} detectada")
+                self.gpu_label.setStyleSheet("color: #ffaa44;")
+                self.vram_label.setText("VRAM: aguardando dados...")
+                self.vram_label.setVisible(True)
             
             # Rede
             download = metrics['network']['download_speed_mb_s'] * 1024
@@ -262,16 +276,14 @@ class OverlayWindow(QWidget):
             print(f"Erro ao atualizar overlay: {e}")
     
     def set_recording_status(self, is_recording, session_name=None):
-        """Atualiza status de gravação no overlay"""
         if is_recording:
-            self.recording_label.setText(f"🔴 Gravando: {session_name}")
+            self.recording_label.setText(f"🔴 Gravando")
             self.recording_label.setStyleSheet("color: #ff4444; font-size: 9px;")
         else:
             self.recording_label.setText("⚪ Não gravando")
             self.recording_label.setStyleSheet("color: #888888; font-size: 9px;")
     
     def start_monitoring(self, save_logs=False):
-        """Inicia o monitoramento em thread separada"""
         if self.is_monitoring:
             return
         
@@ -283,7 +295,6 @@ class OverlayWindow(QWidget):
         self.monitor_thread.start()
         
     def stop_monitoring(self):
-        """Para o monitoramento"""
         self.is_monitoring = False
         
         if self.monitor_thread:
@@ -295,11 +306,15 @@ class OverlayWindow(QWidget):
     def hide_overlay(self):
         """Esconde o overlay"""
         self.stop_monitoring()
+    
+    def close_app(self):
+        """Fecha completamente a aplicação"""
+        self.stop_monitoring()
+        self.close()
+        QApplication.quit()
 
 
 class OverlayController:
-    """Controlador para gerenciar o overlay e logging"""
-    
     def __init__(self):
         self.overlay = None
         self.logger = None
@@ -307,7 +322,6 @@ class OverlayController:
         self.current_session = None
         
     def start(self, save_logs=False, session_name=None):
-        """Inicia o overlay com opção de salvar logs"""
         if self.overlay is None:
             self.overlay = OverlayWindow()
         
@@ -328,7 +342,6 @@ class OverlayController:
         return self.current_session
     
     def stop(self):
-        """Para o overlay e finaliza logging"""
         if self.overlay:
             self.overlay.stop_monitoring()
         
@@ -339,12 +352,10 @@ class OverlayController:
         self.current_session = None
     
     def show(self):
-        """Mostra o overlay"""
         if self.overlay:
             self.overlay.show()
     
     def hide(self):
-        """Esconde o overlay"""
         if self.overlay:
             self.overlay.hide()
 
@@ -354,5 +365,5 @@ if __name__ == "__main__":
     controller = OverlayController()
     controller.start(save_logs=False)
     print("Overlay iniciado! Clique e arraste para mover.")
-    print("Pressione Ctrl+C no terminal para fechar.")
+    print("Clique no X para fechar.")
     sys.exit(app.exec_())
