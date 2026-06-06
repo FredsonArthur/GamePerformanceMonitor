@@ -53,7 +53,6 @@ class PerformanceLogger:
         return str(self.current_session_file)
     
     def _get_csv_headers(self) -> List[str]:
-        """Retorna os cabeçalhos do arquivo CSV"""
         return [
             'timestamp',
             # CPU
@@ -71,6 +70,11 @@ class PerformanceLogger:
             'gpu_vram_used_mb',
             'gpu_vram_total_mb',
             'gpu_clock_mhz',
+            # FPS (novo)
+            'fps_current',
+            'fps_average',
+            'fps_rating',
+            'game_running',
             # Disco
             'disk_read_speed_mb_s',
             'disk_write_speed_mb_s',
@@ -127,7 +131,13 @@ class PerformanceLogger:
             # Sistema
             'load_average_1min': round(metrics['cpu']['load_average'][0], 2),
             'load_average_5min': round(metrics['cpu']['load_average'][1], 2),
-            'load_average_15min': round(metrics['cpu']['load_average'][2], 2)
+            'load_average_15min': round(metrics['cpu']['load_average'][2], 2),
+
+            # FPS
+            'fps_current': round(metrics['fps']['current'], 2),
+            'fps_average': round(metrics['fps']['average'], 2),
+            'fps_rating': metrics['fps']['rating'],
+            'game_running': metrics['fps']['game_running'],
         }
         
         self.csv_writer.writerow(row)

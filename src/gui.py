@@ -128,8 +128,8 @@ class GamePerformanceMonitorGUI(QMainWindow):
     def setup_ui(self):
         """Configura a interface"""
         self.setWindowTitle("GamePerformanceMonitor v0.2.0")
-        self.setGeometry(100, 100, 900, 700)
-        self.setMinimumSize(800, 600)
+        self.setGeometry(100, 100, 1100, 700)
+        self.setMinimumSize(900, 600)
         
         # Widget central
         central_widget = QWidget()
@@ -178,7 +178,7 @@ class GamePerformanceMonitorGUI(QMainWindow):
         
         control_layout.addStretch()
         
-        # Grid para métricas
+        # Grid para métricas (agora com 3 colunas)
         grid = QGridLayout()
         layout.addLayout(grid)
         
@@ -210,6 +210,25 @@ class GamePerformanceMonitorGUI(QMainWindow):
         ram_layout.addWidget(self.ram_total_label)
         grid.addWidget(ram_group, 0, 1)
         
+        # FPS (nova seção)
+        fps_group = QGroupBox("🎮 FPS")
+        fps_layout = QVBoxLayout(fps_group)
+        self.fps_label = QLabel("FPS: --")
+        self.fps_label.setFont(QFont("Arial", 28))
+        self.fps_label.setAlignment(Qt.AlignCenter)
+        fps_layout.addWidget(self.fps_label)
+        self.fps_rating_label = QLabel("Status: Aguardando jogo")
+        self.fps_rating_label.setAlignment(Qt.AlignCenter)
+        fps_layout.addWidget(self.fps_rating_label)
+        self.fps_avg_label = QLabel("Média (60s): --")
+        self.fps_avg_label.setAlignment(Qt.AlignCenter)
+        fps_layout.addWidget(self.fps_avg_label)
+        self.game_detected_label = QLabel("🎮 Nenhum jogo detectado")
+        self.game_detected_label.setAlignment(Qt.AlignCenter)
+        self.game_detected_label.setStyleSheet("color: #888888; font-size: 10px;")
+        fps_layout.addWidget(self.game_detected_label)
+        grid.addWidget(fps_group, 0, 2)
+        
         # GPU
         gpu_group = QGroupBox("🎮 GPU")
         gpu_layout = QVBoxLayout(gpu_group)
@@ -224,7 +243,7 @@ class GamePerformanceMonitorGUI(QMainWindow):
         gpu_layout.addWidget(self.gpu_temp_label)
         self.gpu_vram_label = QLabel("VRAM: 0 MB")
         gpu_layout.addWidget(self.gpu_vram_label)
-        grid.addWidget(gpu_group, 1, 0, 1, 2)
+        grid.addWidget(gpu_group, 1, 0, 1, 3)
         
         # Disco e Rede
         stats_frame = QFrame()
@@ -260,7 +279,7 @@ class GamePerformanceMonitorGUI(QMainWindow):
         label.setAlignment(Qt.AlignCenter)
         layout.addWidget(label)
         
-        label2 = QLabel("Em breve: gráficos históricos de CPU, RAM, GPU e temperatura")
+        label2 = QLabel("Em breve: gráficos históricos de CPU, RAM, GPU, FPS e temperatura")
         label2.setAlignment(Qt.AlignCenter)
         layout.addWidget(label2)
         
@@ -284,6 +303,28 @@ class GamePerformanceMonitorGUI(QMainWindow):
         interval_row.addWidget(self.interval_spin)
         interval_layout.addLayout(interval_row)
         layout.addWidget(interval_group)
+        
+        # Limites de alerta
+        alert_group = QGroupBox("Alertas de Temperatura")
+        alert_layout = QVBoxLayout(alert_group)
+        
+        cpu_alert_row = QHBoxLayout()
+        cpu_alert_row.addWidget(QLabel("Alerta CPU (°C):"))
+        self.cpu_alert_spin = QSpinBox()
+        self.cpu_alert_spin.setRange(60, 100)
+        self.cpu_alert_spin.setValue(80)
+        cpu_alert_row.addWidget(self.cpu_alert_spin)
+        alert_layout.addLayout(cpu_alert_row)
+        
+        gpu_alert_row = QHBoxLayout()
+        gpu_alert_row.addWidget(QLabel("Alerta GPU (°C):"))
+        self.gpu_alert_spin = QSpinBox()
+        self.gpu_alert_spin.setRange(60, 100)
+        self.gpu_alert_spin.setValue(85)
+        gpu_alert_row.addWidget(self.gpu_alert_spin)
+        alert_layout.addLayout(gpu_alert_row)
+        
+        layout.addWidget(alert_group)
         
         # Informações do sistema
         info_group = QGroupBox("Informações do Sistema")
@@ -380,11 +421,19 @@ Diretório de Logs: {Path('logs').absolute()}
         """Atualiza display com métricas"""
         # CPU
         cpu = metrics['cpu']['percent']
+        cpu_temp = metrics['cpu'].get('temperature', 0)
         self.cpu_label.setText(f"Uso: {cpu:.1f}%")
         self.cpu_progress.setValue(int(cpu))
         
-        if metrics['cpu']['temperature'] > 0:
-            self.cpu_temp_label.setText(f"Temperatura: {metrics['cpu']['temperature']:.0f}°C")
+        if cpu_temp > 0:
+            self.cpu_temp_label.setText(f"Temperatura: {cpu_temp:.0f}°C")
+            
+            # Verificar alerta de CPU
+            if hasattr(self, 'cpu_alert_spin') and cpu_temp > self.cpu_alert_spin.value():
+                self.cpu_temp_label.setStyleSheet("color: #ff4444; font-weight: bold;")
+                self.statusBar.showMessage(f"⚠️ ALERTA: CPU em {cpu_temp:.0f}°C!", 3000)
+            else:
+                self.cpu_temp_label.setStyleSheet("color: white;")
         
         if metrics['cpu']['frequency'] > 0:
             self.cpu_freq_label.setText(f"Frequência: {metrics['cpu']['frequency']:.0f} MHz")
@@ -396,17 +445,62 @@ Diretório de Logs: {Path('logs').absolute()}
         self.ram_used_label.setText(f"Usado: {metrics['ram']['used_gb']:.1f} GB")
         self.ram_total_label.setText(f"Total: {metrics['ram']['total_gb']:.1f} GB")
         
+        # FPS
+        if metrics.get('fps') and metrics['fps'].get('game_running', False):
+            fps_current = metrics['fps'].get('current', 0)
+            fps_rating = metrics['fps'].get('rating', 'N/A')
+            fps_avg = metrics['fps'].get('average', 0)
+            
+            self.fps_label.setText(f"{fps_current:.1f}")
+            self.fps_rating_label.setText(f"Status: {fps_rating}")
+            self.fps_avg_label.setText(f"Média (60s): {fps_avg:.1f}")
+            self.game_detected_label.setText("🎮 Jogo em execução!")
+            self.game_detected_label.setStyleSheet("color: #4c9f70; font-size: 10px;")
+            
+            # Cor do FPS baseado na performance
+            if fps_current >= 60:
+                self.fps_label.setStyleSheet("color: #4c9f70; font-size: 28px;")
+            elif fps_current >= 45:
+                self.fps_label.setStyleSheet("color: #ffaa44; font-size: 28px;")
+            elif fps_current >= 30:
+                self.fps_label.setStyleSheet("color: #ff8844; font-size: 28px;")
+            else:
+                self.fps_label.setStyleSheet("color: #ff4444; font-size: 28px;")
+        else:
+            self.fps_label.setText("--")
+            self.fps_rating_label.setText("Status: Aguardando jogo")
+            self.fps_avg_label.setText("Média (60s): --")
+            self.game_detected_label.setText("🎮 Nenhum jogo detectado")
+            self.game_detected_label.setStyleSheet("color: #888888; font-size: 10px;")
+            self.fps_label.setStyleSheet("color: #888888; font-size: 28px;")
+        
         # GPU
-        if metrics['gpu']['percent'] > 0:
-            gpu = metrics['gpu']['percent']
+        gpu = metrics['gpu']['percent']
+        gpu_temp = metrics['gpu'].get('temp', 0)
+        if gpu > 0:
             self.gpu_label.setText(f"Uso: {gpu:.1f}%")
             self.gpu_progress.setValue(int(gpu))
             
-            if metrics['gpu']['temp'] > 0:
-                self.gpu_temp_label.setText(f"Temperatura: {metrics['gpu']['temp']:.0f}°C")
+            if gpu_temp > 0:
+                self.gpu_temp_label.setText(f"Temperatura: {gpu_temp:.0f}°C")
+                
+                # Verificar alerta de GPU
+                if hasattr(self, 'gpu_alert_spin') and gpu_temp > self.gpu_alert_spin.value():
+                    self.gpu_temp_label.setStyleSheet("color: #ff4444; font-weight: bold;")
+                    self.statusBar.showMessage(f"⚠️ ALERTA: GPU em {gpu_temp:.0f}°C!", 3000)
+                else:
+                    self.gpu_temp_label.setStyleSheet("color: white;")
             
             if metrics['gpu']['vram_total_mb'] > 0:
-                self.gpu_vram_label.setText(f"VRAM: {metrics['gpu']['vram_used_mb']:.0f}/{metrics['gpu']['vram_total_mb']:.0f} MB")
+                vram_used = metrics['gpu']['vram_used_mb']
+                vram_total = metrics['gpu']['vram_total_mb']
+                self.gpu_vram_label.setText(f"VRAM: {vram_used:.0f}/{vram_total:.0f} MB")
+            
+            # Atualizar nome da GPU se ainda não foi
+            if self.gpu_name_label.text() == "Modelo: Detectando...":
+                gpu_info = self.monitor.hardware.get_gpu_info()
+                if gpu_info['name'] != 'Desconhecido':
+                    self.gpu_name_label.setText(f"Modelo: {gpu_info['name']}")
         
         # Disco
         self.disk_read_label.setText(f"Leitura: {metrics['disk']['read_speed_mb_s']:.1f} MB/s")
@@ -430,6 +524,13 @@ Diretório de Logs: {Path('logs').absolute()}
             self.ram_progress.setStyleSheet("QProgressBar::chunk { background-color: orange; }")
         else:
             self.ram_progress.setStyleSheet("QProgressBar::chunk { background-color: #4c9f70; }")
+        
+        if gpu > 80:
+            self.gpu_progress.setStyleSheet("QProgressBar::chunk { background-color: red; }")
+        elif gpu > 60:
+            self.gpu_progress.setStyleSheet("QProgressBar::chunk { background-color: orange; }")
+        else:
+            self.gpu_progress.setStyleSheet("QProgressBar::chunk { background-color: #4c9f70; }")
     
     def start_monitoring(self):
         """Inicia monitoramento"""

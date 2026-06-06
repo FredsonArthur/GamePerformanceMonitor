@@ -5,10 +5,8 @@ Suporta: Posição arrastável, sempre no topo, fundo transparente
 
 import sys
 import os
-import threading
 import time
 from datetime import datetime
-from pynput import keyboard
 
 # Adiciona o diretório src ao path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -55,38 +53,30 @@ class OverlayWindow(QWidget):
         self.dragging = False
         self.drag_position = QPoint()
         
-        self.setup_ui()
         self.setup_overlay_properties()
+        self.setup_ui()
         
     def setup_overlay_properties(self):
         """Configura propriedades da janela overlay"""
-        # Tornar janela transparente e sempre no topo
         self.setWindowFlags(
-            Qt.FramelessWindowHint |  # Sem bordas
-            Qt.WindowStaysOnTopHint |  # Sempre no topo
-            Qt.Tool |  # Sem ícone na barra de tarefas
-            Qt.WindowTransparentForInput  # Permite clicar através da janela (opcional)
+            Qt.FramelessWindowHint |
+            Qt.WindowStaysOnTopHint |
+            Qt.Tool
         )
         
-        # Remover a flag WindowTransparentForInput se quiser interagir com o overlay
-        # Por enquanto, vamos manter para testes
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_ShowWithoutActivating)
         
-        self.setAttribute(Qt.WA_TranslucentBackground)  # Fundo transparente
-        self.setAttribute(Qt.WA_ShowWithoutActivating)  # Não rouba foco
-        
-        # Posição inicial (canto superior direito)
         screen = QApplication.primaryScreen().geometry()
-        self.setGeometry(screen.width() - 300, 100, 280, 180)
+        self.setGeometry(screen.width() - 300, 100, 280, 220)
         
     def setup_ui(self):
         """Configura os elementos da interface do overlay"""
-        # Layout principal
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(5)
         self.setLayout(layout)
         
-        # Frame com fundo semi-transparente
         self.frame = QFrame()
         self.frame.setStyleSheet("""
             QFrame {
@@ -105,13 +95,12 @@ class OverlayWindow(QWidget):
         frame_layout = QVBoxLayout(self.frame)
         frame_layout.setContentsMargins(10, 10, 10, 10)
         
-        # Título com ícone
+        # Título
         title_layout = QHBoxLayout()
         title_label = QLabel("🎮 GamePerformanceMonitor")
         title_label.setStyleSheet("font-weight: bold; font-size: 12px; color: #4c9f70;")
         title_layout.addWidget(title_label)
         
-        # Botão de fechar
         self.close_btn = QPushButton("✕")
         self.close_btn.setFixedSize(20, 20)
         self.close_btn.setStyleSheet("""
@@ -138,7 +127,7 @@ class OverlayWindow(QWidget):
         frame_layout.addWidget(line)
         
         # Labels para métricas
-        self.fps_label = QLabel("FPS: --")
+        self.fps_label = QLabel("🎮 FPS: --")
         self.fps_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         frame_layout.addWidget(self.fps_label)
         
@@ -157,38 +146,32 @@ class OverlayWindow(QWidget):
         self.net_label = QLabel("🌐 ↓-- KB/s  ↑-- KB/s")
         frame_layout.addWidget(self.net_label)
         
-        # Status de gravação
         self.recording_label = QLabel("⚪ Não gravando")
         self.recording_label.setStyleSheet("color: #888888; font-size: 9px;")
         frame_layout.addWidget(self.recording_label)
         
         layout.addWidget(self.frame)
         
-        # Tornar o frame arrastável
+        # Tornar arrastável
         self.frame.mousePressEvent = self.mouse_press_event
         self.frame.mouseMoveEvent = self.mouse_move_event
         self.frame.mouseReleaseEvent = self.mouse_release_event
-        
-        # Barra de título também arrastável
         title_label.mousePressEvent = self.mouse_press_event
         title_label.mouseMoveEvent = self.mouse_move_event
         title_label.mouseReleaseEvent = self.mouse_release_event
         
     def mouse_press_event(self, event):
-        """Inicia arrasto da janela"""
         if event.button() == Qt.LeftButton:
             self.dragging = True
             self.drag_position = event.globalPos() - self.frameGeometry().topLeft()
             event.accept()
             
     def mouse_move_event(self, event):
-        """Move a janela durante arrasto"""
         if self.dragging:
             self.move(event.globalPos() - self.drag_position)
             event.accept()
             
     def mouse_release_event(self, event):
-        """Finaliza arrasto"""
         self.dragging = False
         event.accept()
         
@@ -200,7 +183,6 @@ class OverlayWindow(QWidget):
             cpu_temp = metrics['cpu'].get('temperature', 0)
             self.cpu_label.setText(f"CPU: {cpu_percent:.0f}%  🌡️ {cpu_temp:.0f}°C")
             
-            # Cor da CPU baseada no uso
             if cpu_percent > 80:
                 self.cpu_label.setStyleSheet("color: #ff4444;")
             elif cpu_percent > 60:
@@ -221,6 +203,25 @@ class OverlayWindow(QWidget):
             else:
                 self.ram_label.setStyleSheet("color: #4c9f70;")
             
+            # FPS
+            if metrics.get('fps') and metrics['fps'].get('game_running', False):
+                fps_current = metrics['fps'].get('current', 0)
+                self.fps_label.setText(f"🎮 FPS: {fps_current:.1f}")
+                self.fps_label.setVisible(True)
+                
+                if fps_current >= 60:
+                    self.fps_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #4c9f70;")
+                elif fps_current >= 45:
+                    self.fps_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #ffaa44;")
+                elif fps_current >= 30:
+                    self.fps_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #ff8844;")
+                else:
+                    self.fps_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #ff4444;")
+            else:
+                self.fps_label.setText("🎮 FPS: --")
+                self.fps_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #888888;")
+                self.fps_label.setVisible(True)
+            
             # GPU
             gpu_percent = metrics['gpu']['percent']
             gpu_temp = metrics['gpu']['temp']
@@ -236,7 +237,6 @@ class OverlayWindow(QWidget):
                 else:
                     self.gpu_label.setStyleSheet("color: #4c9f70;")
                 
-                # VRAM
                 if metrics['gpu']['vram_total_mb'] > 0:
                     vram_used = metrics['gpu']['vram_used_mb']
                     vram_total = metrics['gpu']['vram_total_mb']
@@ -248,12 +248,11 @@ class OverlayWindow(QWidget):
                 self.gpu_label.setVisible(False)
                 self.vram_label.setVisible(False)
             
-            # Rede (convertendo para KB/s para melhor visualização)
-            download = metrics['network']['download_speed_mb_s'] * 1024  # MB/s -> KB/s
+            # Rede
+            download = metrics['network']['download_speed_mb_s'] * 1024
             upload = metrics['network']['upload_speed_mb_s'] * 1024
             self.net_label.setText(f"🌐 ↓{download:.0f} KB/s  ↑{upload:.0f} KB/s")
             
-            # Ajustar visibilidade da rede se estiver ociosa
             if download < 1 and upload < 1:
                 self.net_label.setStyleSheet("color: #888888;")
             else:
@@ -277,9 +276,8 @@ class OverlayWindow(QWidget):
             return
         
         self.is_monitoring = True
-        self.show()  # Mostrar a janela
+        self.show()
         
-        # Iniciar thread de monitoramento
         self.monitor_thread = OverlayThread(self.monitor, interval=1)
         self.monitor_thread.metrics_updated.connect(self.update_metrics)
         self.monitor_thread.start()
@@ -298,18 +296,6 @@ class OverlayWindow(QWidget):
         """Esconde o overlay"""
         self.stop_monitoring()
 
-def setup_hotkey(self):
-    """Configura atalho global"""
-    def on_activate():
-        if self.isVisible():
-            self.hide()
-        else:
-            self.show()
-    
-    hotkey = keyboard.GlobalHotKeys({
-        '<ctrl>+<shift>+m': on_activate
-    })
-    hotkey.start()
 
 class OverlayController:
     """Controlador para gerenciar o overlay e logging"""
@@ -322,11 +308,9 @@ class OverlayController:
         
     def start(self, save_logs=False, session_name=None):
         """Inicia o overlay com opção de salvar logs"""
-        # Criar overlay se não existir
         if self.overlay is None:
             self.overlay = OverlayWindow()
         
-        # Iniciar logger se necessário
         if save_logs:
             if self.logger is None:
                 self.logger = PerformanceLogger()
@@ -340,9 +324,7 @@ class OverlayController:
         else:
             self.overlay.set_recording_status(False)
         
-        # Iniciar monitoramento
         self.overlay.start_monitoring(save_logs)
-        
         return self.current_session
     
     def stop(self):
@@ -367,20 +349,10 @@ class OverlayController:
             self.overlay.hide()
 
 
-# Teste rápido
 if __name__ == "__main__":
-    import sys
-    
     app = QApplication(sys.argv)
-    
-    # Criar controlador
     controller = OverlayController()
-    
-    # Iniciar overlay (sem salvar logs por padrão)
     controller.start(save_logs=False)
-    
-    print("Overlay iniciado! Pressione Ctrl+C no terminal para fechar.")
-    print("Dica: Clique e arraste o overlay para mover pela tela")
-    
-    # Executar aplicação
+    print("Overlay iniciado! Clique e arraste para mover.")
+    print("Pressione Ctrl+C no terminal para fechar.")
     sys.exit(app.exec_())

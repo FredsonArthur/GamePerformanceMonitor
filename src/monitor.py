@@ -8,6 +8,8 @@ import time
 from datetime import datetime
 from typing import Dict, List, Optional
 from hardware_detector import HardwareDetector
+from fps_capture import FPSCapture
+from fps_capture import FPSCapture
 
 class SystemMonitor:
     """Monitor principal que coleta todas as métricas do sistema"""
@@ -18,6 +20,8 @@ class SystemMonitor:
         self.previous_disk = psutil.disk_io_counters()
         self.last_net_time = time.time()
         self.last_disk_time = time.time()
+        self.fps_capture = FPSCapture()
+        self.fps_capture = FPSCapture()
         
     def get_cpu_metrics(self) -> Dict[str, any]:
         """Coleta métricas da CPU"""
@@ -143,6 +147,7 @@ class SystemMonitor:
         cpu = self.get_cpu_metrics()
         ram = self.get_ram_metrics()
         gpu = self.hardware.get_gpu_metrics()
+        fps = self.get_fps_metrics()
         disk = self.get_disk_metrics()
         network = self.get_network_metrics()
         processes = self.get_process_metrics()
@@ -152,6 +157,7 @@ class SystemMonitor:
             'cpu': cpu,
             'ram': ram,
             'gpu': gpu,
+            'fps': fps,
             'disk': disk,
             'network': network,
             'processes': processes,
@@ -189,6 +195,19 @@ class SystemMonitor:
             else:
                 print()
         
+        # FPS
+        if metrics.get('fps') and metrics['fps'].get('game_running', False):
+            fps_current = metrics['fps'].get('current', 0)
+            fps_rating = metrics['fps'].get('rating', 'N/A')
+            fps_avg = metrics['fps'].get('average', 0)
+            print(f"🎮 FPS: {fps_current:.1f} ({fps_rating})", end='')
+            if fps_avg > 0:
+                print(f" | Média 60s: {fps_avg:.1f}")
+            else:
+                print()
+        else:
+            print("🎮 FPS: -- (nenhum jogo detectado)")
+        
         # Disco
         print(f"💾 Disco: ↓{metrics['disk']['read_speed_mb_s']:.1f} MB/s ↑{metrics['disk']['write_speed_mb_s']:.1f} MB/s")
         
@@ -199,6 +218,32 @@ class SystemMonitor:
         print(f"\n📊 Top processos (CPU):")
         for i, proc in enumerate(metrics['processes'], 1):
             print(f"  {i}. {proc['name']:<20} CPU: {proc['cpu_percent']:.1f}%  RAM: {proc['memory_percent']:.1f}%")
+
+    def get_fps_metrics(self) -> Dict[str, any]:
+        """Coleta métricas de FPS"""
+        # Verificar se fps_capture está disponível
+        if hasattr(self, 'fps_capture'):
+            # Usar GPU percent para estimativa se necessário
+            gpu_percent = self.hardware.get_gpu_metrics()['percent']
+            current_fps = self.fps_capture.get_current_fps(gpu_percent)
+            avg_fps = self.fps_capture.get_average_fps(60)
+            
+            return {
+                'current': current_fps,
+                'average': avg_fps,
+                'rating': self.fps_capture.get_fps_rating(current_fps),
+                'game_running': self.fps_capture.is_game_running(),
+                'games': self.fps_capture.detect_games()
+            }
+        else:
+            # Fallback se fps_capture não estiver disponível
+            return {
+                'current': 0,
+                'average': 0,
+                'rating': 'N/A',
+                'game_running': False,
+                'games': []
+            }
 
 # Teste rápido se executado diretamente
 if __name__ == "__main__":

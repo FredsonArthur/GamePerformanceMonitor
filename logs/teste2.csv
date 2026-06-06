@@ -1,0 +1,5 @@
+timestamp,cpu_percent,cpu_temperature,cpu_frequency,ram_percent,ram_used_gb,ram_total_gb,gpu_percent,gpu_temperature,gpu_vram_percent,gpu_vram_used_mb,gpu_vram_total_mb,gpu_clock_mhz,fps_current,fps_average,fps_rating,game_running,disk_read_speed_mb_s,disk_write_speed_mb_s,network_download_speed_mb_s,network_upload_speed_mb_s,load_average_1min,load_average_5min,load_average_15min
+2026-06-06 08:10:01,5.0,43.375,1498.0237499999994,47.9,6.38,13.32,0,42.0,55.11,1128.61,2048.0,400,0,0.0,Ruim 🔴,True,0.02,4.2,0.43,0.01,0.45,0.7,0.83
+2026-06-06 08:10:04,0.6,43.75,1596.9023125,47.9,6.38,13.32,0,41.0,55.11,1128.62,2048.0,2200,0,0.0,Ruim 🔴,True,0.0,0.34,0.4,0.01,0.45,0.7,0.83
+2026-06-06 08:10:06,1.3,43.375,1508.85175,47.9,6.38,13.32,0,41.0,55.11,1128.62,2048.0,200,0,0.0,Ruim 🔴,True,0.0,0.44,0.54,0.0,0.49,0.71,0.83
+2026-06-06 08:10:08,4.4,43.125,1452.5448124999996,47.9,6.38,13.32,0,41.0,55.11,1128.62,2048.0,2200,0,0.0,Ruim 🔴,True,0.0,2.5,0.44,0.01,0.49,0.71,0.83
