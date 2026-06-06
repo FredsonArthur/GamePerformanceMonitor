@@ -9,7 +9,6 @@ from datetime import datetime
 from typing import Dict, List, Optional
 from hardware_detector import HardwareDetector
 from fps_capture import FPSCapture
-from fps_capture import FPSCapture
 
 class SystemMonitor:
     """Monitor principal que coleta todas as métricas do sistema"""
@@ -20,7 +19,6 @@ class SystemMonitor:
         self.previous_disk = psutil.disk_io_counters()
         self.last_net_time = time.time()
         self.last_disk_time = time.time()
-        self.fps_capture = FPSCapture()
         self.fps_capture = FPSCapture()
         
     def get_cpu_metrics(self) -> Dict[str, any]:
